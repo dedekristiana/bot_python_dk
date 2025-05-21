@@ -1,3 +1,4 @@
+import os
 import time
 import requests
 from binance.client import Client
@@ -5,20 +6,20 @@ import pandas as pd
 import ta
 from datetime import datetime
 
-# === KONFIGURASI ===
-API_KEY = 'ISI_API_KEY_BINANCE_MU'
-API_SECRET = 'ISI_API_SECRET_MU'
+# === AMBIL KONFIGURASI DARI ENV ===
+API_KEY = os.environ.get('API_KEY')
+API_SECRET = os.environ.get('API_SECRET')
 client = Client(API_KEY, API_SECRET)
 
 SYMBOL = 'XRPUSDT'
 INTERVAL = Client.KLINE_INTERVAL_1MINUTE
-ORDER_SIZE = 50
+ORDER_SIZE = 50  # USDT per order simulasi
 MAX_ORDERS_PER_DAY = 3
 TP_MIN = 0.005
 TP_MAX = 0.01
 SL = 0.005
-TELEGRAM_TOKEN = 'ISI_TOKEN_BOT'
-CHAT_ID = 'ISI_CHAT_ID'
+TELEGRAM_TOKEN = os.environ.get('TELEGRAM_TOKEN')
+CHAT_ID = os.environ.get('CHAT_ID')
 
 orders_today = 0
 last_order_date = None
@@ -30,7 +31,7 @@ def send_telegram(msg):
         data = {'chat_id': CHAT_ID, 'text': msg}
         requests.post(url, data=data)
     except Exception as e:
-        print(f"Telegram error: {e}")
+        print("Telegram Error:", e)
 
 def get_data():
     klines = client.get_klines(symbol=SYMBOL, interval=INTERVAL, limit=100)
@@ -103,25 +104,24 @@ def check_active_orders(current_price):
 
         if action == 'BUY':
             if current_price >= tp:
-                send_telegram(f"✅ TP HIT! BUY at {order['entry_price']:.4f}, TP at {current_price:.4f}")
+                send_telegram(f"ORDER TP HIT! BUY at {order['entry_price']:.4f}, TP: {current_price:.4f}")
                 closed_orders.append(order)
             elif current_price <= sl:
-                send_telegram(f"⚠️ SL HIT! BUY at {order['entry_price']:.4f}, SL at {current_price:.4f}")
+                send_telegram(f"ORDER SL HIT! BUY at {order['entry_price']:.4f}, SL: {current_price:.4f}")
                 closed_orders.append(order)
-
         elif action == 'SELL':
             if current_price <= tp:
-                send_telegram(f"✅ TP HIT! SELL at {order['entry_price']:.4f}, TP at {current_price:.4f}")
+                send_telegram(f"ORDER TP HIT! SELL at {order['entry_price']:.4f}, TP: {current_price:.4f}")
                 closed_orders.append(order)
             elif current_price >= sl:
-                send_telegram(f"⚠️ SL HIT! SELL at {order['entry_price']:.4f}, SL at {current_price:.4f}")
+                send_telegram(f"ORDER SL HIT! SELL at {order['entry_price']:.4f}, SL: {current_price:.4f}")
                 closed_orders.append(order)
 
     for order in closed_orders:
         active_orders.remove(order)
 
 # === LOOP UTAMA ===
-send_telegram("🚀 Bot trading dimulai...")
+send_telegram("🚀 BOT TRADING DIMULAI!")
 
 while True:
     now = datetime.now()
@@ -141,9 +141,10 @@ while True:
             if signal:
                 simulate_order(signal, price)
         else:
-            print("Menunggu... order penuh atau masih aktif.")
+            print(f"[{now.strftime('%H:%M:%S')}] Menunggu kondisi order...")
 
     except Exception as e:
         send_telegram(f"❌ ERROR: {str(e)}")
+        print("ERROR:", e)
 
     time.sleep(60)
